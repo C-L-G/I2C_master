@@ -12,10 +12,14 @@ madified:
 module rev_tap (
     input               clock,
     input               rst_n,
+    input               enable,
+    input               ack_en,
     input               scl_i,
     input               sda_i,
     output logic[2:0]   data,
-    output logic        valid
+    output logic        valid,
+    output logic        slaver_ack_ok,
+    output logic        last_9_bit
 );
 
 localparam  [2:0]   CMD_START   = 3'd1,
@@ -68,7 +72,7 @@ edge_generator #(
 /*	output		*/.falling        (sda_falling)
 );
 
-logic   scl_lat2,sda_lat2;
+bit   scl_lat2,sda_lat2;
 cross_clk_sync #(
 	.LAT	  (2  ),
 	.DSIZE	  (2  )
@@ -85,24 +89,36 @@ logic       start_flag;
 logic       high_flag;
 logic       low_flag;
 
-always@(posedge clock,negedge rst_n)
+always@(posedge clock/*,negedge rst_n*/)
     if(~rst_n)  start_flag  <= 1'b0;
     else        start_flag  <= sda_falling && scl_lat2;
 
-always@(posedge clock,negedge rst_n)
+always@(posedge clock/*,negedge rst_n*/)
     if(~rst_n)  stop_flag  <= 1'b0;
     else        stop_flag  <= sda_raising && scl_lat2;
 
-always@(posedge clock,negedge rst_n)
+always@(posedge clock/*,negedge rst_n*/)
     if(~rst_n)  high_flag  <= 1'b0;
-    else        high_flag  <= scl_raising && sda_lat2;
+    // else        high_flag  <= scl_raising && sda_lat2==1'b1;
+    else begin
+        if(scl_raising)
+            if(sda_lat2!=1'b0)
+                    high_flag  <= 1'b1;
+            else    high_flag  <= 1'b0;
+        else        high_flag  <= 1'b0;
+    end
 
-always@(posedge clock,negedge rst_n)
+always@(posedge clock/*,negedge rst_n*/)
     if(~rst_n)  low_flag  <= 1'b0;
-    else        low_flag  <= scl_raising && !sda_lat2;
+    else begin
+        if(scl_raising)
+            if(sda_lat2==1'b0)
+                    low_flag  <= 1'b1;
+            else    low_flag  <= 1'b0;
+        else        low_flag  <= 1'b0;
+    end
 
-
-always@(posedge clock,negedge rst_n)
+always@(posedge clock/*,negedge rst_n*/)
     if(~rst_n)  data    <= 3'd0;
     else begin
         if(start_flag)
@@ -116,8 +132,45 @@ always@(posedge clock,negedge rst_n)
         else    data    <= 3'd0;
     end
 
-always@(posedge clock,negedge rst_n)
+always@(posedge clock/*,negedge rst_n*/)
     if(~rst_n)  valid   <= 1'b0;
-    else        valid   <= stop_flag |  start_flag | high_flag | low_flag;
+    else  begin
+        if(enable)
+                valid   <= stop_flag |  start_flag | high_flag | low_flag;
+        else    valid   <= 1'b0;
+    end
 
+always@(posedge clock/*,negedge rst_n*/)
+    if(~rst_n)  slaver_ack_ok    <= 1'b0;
+    else begin
+        if(ack_en)
+                slaver_ack_ok    <= low_flag;
+        else    slaver_ack_ok    <= 1'b0;
+    end
+
+reg [3:0]   bcnt;
+always@(posedge clock/*,negedge rst_n*/)
+    if(~rst_n)  bcnt    <= 4'd0;
+    else begin
+        if(start_flag || stop_flag)
+                bcnt    <= 4'd0;
+        else begin
+            if(scl_raising)begin
+                if(bcnt == 4'd8)
+                        bcnt    <= 4'd0;
+                else    bcnt    <= bcnt + 1'b1;
+            end else    bcnt    <= bcnt;
+        end
+    end
+
+always@(posedge clock/*,negedge rst_n*/)
+    if(~rst_n)  last_9_bit  <= 1'b0;
+    else begin
+        if(scl_raising)begin
+            if(bcnt == 4'd8)
+                    last_9_bit  <= 1'b1;
+            else    last_9_bit  <= 1'b0;
+        end else    last_9_bit  <= 1'b0;
+    end
+    
 endmodule

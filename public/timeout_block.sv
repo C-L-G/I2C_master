@@ -24,7 +24,7 @@ module timeout_block #(
 
 logic en;
 
-always@(posedge clock,negedge rst_n)
+always@(posedge clock/*,negedge rst_n*/)
     if(~rst_n)  en  <= 1'b0;
     else        en  <= enable;
 
@@ -41,7 +41,7 @@ edge_generator #(
 );
 
 integer    cnt;
-always@(posedge clock,negedge rst_n)
+always@(posedge clock/*,negedge rst_n*/)
     if(~rst_n)  cnt     <= 32'd0;
     else begin
         if(MODE=="NOLD")begin
@@ -59,7 +59,7 @@ always@(posedge clock,negedge rst_n)
         end
     end
 
-always@(posedge clock,negedge rst_n)begin
+always@(posedge clock/*,negedge rst_n*/)begin
     if(~rst_n)begin
         timeout_pulse   <= 1'b0;
         timeout         <= 1'b0;

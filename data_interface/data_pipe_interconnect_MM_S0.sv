@@ -15,7 +15,7 @@ module data_pipe_interconnect_MM_S0 #(
     input               clock,
     input               rst_n,
     input               clk_en,
-    input               vld_sw,
+    input               sw_vld,
     input [2:0]         sw,
     output logic[2:0]   curr_path,
 
@@ -91,7 +91,7 @@ localparam      IDLE                    = 4'd0,
                 VD_CN_VD_BUF_OPD_CLU    = 4'd4,     //  valid connector,valid buffer,open down stream ,close upstream
                 OVER_FLOW               = 4'd5;     //  error
 
-always@(posedge clock,negedge rst_n)
+always@(posedge clock/*,negedge rst_n*/)
     if(~rst_n)   cstate  <= IDLE;
     else         cstate  <= nstate;
 
@@ -134,7 +134,7 @@ always@(*)
 //--->> current path <<---------------------
 logic curr_path_vld;
 
-always@(posedge clock,negedge rst_n)
+always@(posedge clock/*,negedge rst_n*/)
     if(~rst_n)  curr_path   <= 3'd0;
     else
         case(nstate)
@@ -143,19 +143,19 @@ always@(posedge clock,negedge rst_n)
         default:curr_path   <= curr_path;
         endcase
 
-always@(posedge clock,negedge rst_n)
+always@(posedge clock/*,negedge rst_n*/)
     if(~rst_n)  curr_path_vld   <= 1'd0;
     else
         case(nstate)
         IDLE,EM_CN_EM_BUF:
                 curr_path_vld   <= sw_vld;
         default:curr_path_vld   <= curr_path_vld;
-        end
+        endcase
 //---<< current path >>---------------------
 //--->> to up ready signal <<---------------
 reg             to_u_ready_reg;
 reg             over_buf_vld;
-always@(posedge clock,negedge rst_n)
+always@(posedge clock/*,negedge rst_n*/)
     if(~rst_n)   to_up_ready   <= 1'd0;
     else begin
         to_up_ready   <= 8'd0;
@@ -181,7 +181,7 @@ always@(posedge clock,negedge rst_n)
 reg [DSIZE-1:0]     connector;
 // reg                 connector_vld;
 reg [DSIZE-1:0]     over_buf;
-always@(posedge clock,negedge rst_n)
+always@(posedge clock/*,negedge rst_n*/)
     if(~rst_n)   connector   <= {DSIZE{1'b0}};
     else
         case(nstate)
@@ -197,7 +197,7 @@ always@(posedge clock,negedge rst_n)
         endcase
 
 
-always@(posedge clock,negedge rst_n)
+always@(posedge clock/*,negedge rst_n*/)
     if(~rst_n)   connector_vld   <= 1'b0;
     else
         case(nstate)
@@ -213,7 +213,7 @@ always@(posedge clock,negedge rst_n)
         endcase
 //---<< CONNECTOR >>------------------
 //----->> BUFFER <<---------------------
-always@(posedge clock,negedge rst_n)begin:BUFFER_BLOCK
+always@(posedge clock/*,negedge rst_n*/)begin:BUFFER_BLOCK
     if(~rst_n)begin
         over_buf    <= {DSIZE{1'b0}};
     end else begin
@@ -232,7 +232,7 @@ always@(posedge clock,negedge rst_n)begin:BUFFER_BLOCK
         endcase
 end end
 
-always@(posedge clock,negedge rst_n)
+always@(posedge clock/*,negedge rst_n*/)
     if(~rst_n)   over_buf_vld    <= 1'b0;
     else
         case(nstate)
@@ -249,7 +249,7 @@ always@(posedge clock,negedge rst_n)
 
 assign empty_buffer = !over_buf_vld;
 assign full_buffer  =  over_buf_vld;
-always@(posedge clock,negedge rst_n)
+always@(posedge clock/*,negedge rst_n*/)
     if(~rst_n)   over_flow_buffer    <= 1'b0;
     else
         case(nstate)
@@ -262,23 +262,23 @@ always@(posedge clock,negedge rst_n)
 //-----<< BUFFER >>---------------------
 //----->> to down data <<---------------
 reg         to_d_wr_en_reg;
-/*
-always@(posedge clock,negedge rst_n)
-    if(~rst_n)  to_d_wr_en_reg  <= 1'b0;
-    else
-        case(nstate)
-        VD_CN_EM_BUF:
-            if(~(from_up_vld & to_up_ready) && from_down_ready && clk_en)
-                    to_d_wr_en_reg  <= 1'b0;
-            else    to_d_wr_en_reg  <= 1'b1;
-        VD_CN_VD_BUF_OPD_CLU:
-            if(clk_en)
-                    to_d_wr_en_reg  <= 1'b1;
-            else    to_d_wr_en_reg  <= to_d_wr_en_reg;
-        default:to_d_wr_en_reg  <= 1'b0;
-        endcase
-*/
-always@(posedge clock,negedge rst_n)
+
+// always@(posedge clock,negedge rst_n)
+//     if(~rst_n)  to_d_wr_en_reg  <= 1'b0;
+//     else
+//         case(nstate)
+//         VD_CN_EM_BUF:
+//             if(~(from_up_vld & to_up_ready) && from_down_ready && clk_en)
+//                     to_d_wr_en_reg  <= 1'b0;
+//             else    to_d_wr_en_reg  <= 1'b1;
+//         VD_CN_VD_BUF_OPD_CLU:
+//             if(clk_en)
+//                     to_d_wr_en_reg  <= 1'b1;
+//             else    to_d_wr_en_reg  <= to_d_wr_en_reg;
+//         default:to_d_wr_en_reg  <= 1'b0;
+//         endcase
+
+always@(posedge clock/*,negedge rst_n*/)
     if(~rst_n)  to_down_vld_array  <= 8'b0000_0000;
     else begin
         to_down_vld_array  <= 8'b0000_0000;

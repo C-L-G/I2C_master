@@ -5,11 +5,11 @@ ______________  \/  \/ | \/ | ______________
 descript:
 author : Young
 Version: VERA.0.0
-creaded: 2016/11/15 上午11:48:26
+creaded: 2016/11/17 下午7:02:13
 madified:
 ***********************************************/
 `timescale 1ns/1ps
-module simple_wr(
+module free_bus(
     input       enable,
     common_interface.master cinf
 );
@@ -28,9 +28,9 @@ localparam      MAIN_CMD_IDLE = 4'd0,
 
 assign cinf.cmd         = COMPLETE_WR;
 assign cinf.addr        = 7'b1010_000;
-assign cinf.burst_len   = 1;
+assign cinf.burst_len   = 0;
 
-assign cinf.wr_data     = 8'b1000_0001;
+assign cinf.wr_data     = 8'b1000_0000;
 assign cinf.wr_last     = 0;
 
 assign cinf.rd_ready    = 1;

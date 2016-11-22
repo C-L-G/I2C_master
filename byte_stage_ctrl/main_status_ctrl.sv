@@ -10,7 +10,9 @@ madified:
 ***********************************************/
 `timescale 1ns/1ps
 module main_status_ctrl #(
-    parameter ALEN = 7
+    parameter ALEN      = 7,
+    parameter   CSIZE   = 4,
+    parameter   MODULE_ID = 0
 )(
     input                   clock,
     input                   rst_n,
@@ -18,55 +20,71 @@ module main_status_ctrl #(
     input [3:0]             cmd,     //write read
     input                   cmd_vld,
     output logic            cmd_ready,
-    output logic            cmd_finish
-    input [15:0]            addr,
+    output logic            cmd_finish,
+    input [ALEN-1:0]        addr,
     input [23:0]            burst_len,
     output logic [4:0]      curr_status,
 
     output logic            exec_addr,
-    output logic[0:9]       address_curr,
-    output logic[23:0]      exec_wr_len,
+    output logic[0:ALEN-1]  address_curr,
+    output logic[23:0]      exec_len,
     input                   exec_addr_finish,
     output logic            exec_wr,
     input                   exec_wr_finish,
     output logic            exec_rd,
     input                   exec_rd_finish,
+    output logic            curr_wr_or_rd,
     // output logic            exist_stop,
     //-->> tras 4 tap
     output logic             tras_cmd_vld,
-    output logic[2:0]        tras_cmd,
+    output logic[CSIZE-1:0]  tras_cmd,
     input                    tras_cmd_ready,
+    output logic[3:0]        tras_cmd_mid,
+    output logic[1:0]        tras_cmd_proc_id,
+    input  [3:0]             curr_mid,
+    input  [1:0]             curr_proc_id,
     //--->> fifo ctrl
     output logic             wfifo_rst,
     input                    wfifo_empty,
     output logic             rfifo_rst,
-    input                    rfifo_empty
+    input                    rfifo_empty,
+    input                    slaver_ack_ok,
+    input                    last_9_bit
 );
-localparam  [2:0]   CMD_IDLE    = 3'd0;
-                    CMD_START   = 3'd1,
-                    CMD_1       = 3'd2,
-                    CMD_0       = 3'd3,
-                    CMD_STOP    = 3'd4;
+// localparam  [CSIZE-1:0]
+//                             CMD_START   = 4'd1,
+//                             CMD_1       = 4'd2,
+//                             CMD_0       = 4'd3,
+//                             CMD_STOP    = 4'd4,
+//                             CMD_ACK     = 4'd5,
+//                             CMD_WR      = 4'd6,
+//                             CMD_RD      = 4'd7,
+//                             CMD_L0      = 4'd8,        //last 0
+//                             CMD_L1      = 4'd9;
+
+import parameter_package::*;
 
 //----->> MAIN -CONTRL <<-------------------
-localparam      MAIN_CMD_IDLE = 4'd0;
+localparam      MAIN_CMD_IDLE = 4'd0,
                 COMPLETE_WR = 4'd1,
                 WR_WNO_STOP = 4'd2, //write without stop
                 COMPLETE_RD = 4'd3,
-                RD_WNO_STOP = 4'd4; //read without stop
-                SET_IDLE    = 4'd5
+                RD_WNO_STOP = 4'd4, //read without stop
+                SET_IDLE    = 4'd5;
 
 typedef enum {MIDLE,GET_CMD,EXEC_ADDR,EXEC_WR,EXEC_RD,SET_STOP,MFSH,RESET_FIFO} MSTATUS;
 
 MSTATUS mcstate,mnstate;
 
-always@(posedge clock,negedge rst_n)
+always@(posedge clock/*,negedge rst_n*/)
     if(~rst_n)  mcstate = MIDLE;
     else        mcstate = mnstate;
 
-logic           curr_wr_or_rd;
+// logic           curr_wr_or_rd;
 logic           exist_stop;
 logic [3:0]     curr_cmd;
+logic           zero_len;
+
 
 always@(*)
     case(mcstate)
@@ -76,11 +94,16 @@ always@(*)
         else    mnstate = MIDLE;
     GET_CMD:
         if(curr_cmd != SET_IDLE)
-                mnstate = EXEC;
+                mnstate = EXEC_ADDR;
         else    mnstate = RESET_FIFO;
     EXEC_ADDR:
         if(exec_addr_finish)begin
-            if(curr_wr_or_rd)
+            if(zero_len)begin
+                if(exist_stop)
+                        mnstate = SET_STOP;
+                else    mnstate = MFSH;
+            end
+            else if(curr_wr_or_rd)
                 mnstate = EXEC_WR;
             else
                 mnstate = EXEC_RD;
@@ -88,11 +111,15 @@ always@(*)
                 mnstate = EXEC_ADDR;
     EXEC_WR:
         if(exec_wr_finish)
-                mnstate = SET_STOP;
+            if(exist_stop)
+                    mnstate = SET_STOP;
+            else    mnstate = MFSH;
         else    mnstate = EXEC_WR;
     EXEC_RD:
         if(exec_rd_finish)
-                mnstate = MFSH;
+            if(exist_stop)
+                    mnstate = SET_STOP;
+            else    mnstate = MFSH;
         else    mnstate = EXEC_RD;
     SET_STOP:
         if(tras_cmd_vld && tras_cmd_ready)
@@ -107,7 +134,7 @@ always@(*)
     default:    mnstate = MIDLE;
     endcase
 
-always@(posedge clock,negedge rst_n)
+always@(posedge clock/*,negedge rst_n*/)
     if(~rst_n)  cmd_ready   <= 1'b0;
     else
         case(mnstate)
@@ -115,7 +142,7 @@ always@(posedge clock,negedge rst_n)
         default:cmd_ready   <= 1'b0;
         endcase
 //
-always@(posedge clock,negedge rst_n)
+always@(posedge clock/*,negedge rst_n*/)
     if(~rst_n)  cmd_finish   <= 1'b0;
     else
         case(mnstate)
@@ -128,7 +155,7 @@ logic   exec_addr_req;
 logic   exec_rd_req;
 
 
-always@(posedge clock,negedge rst_n)begin
+always@(posedge clock/*,negedge rst_n*/)begin
     if(~rst_n)begin
         exec_wr_req     <= 1'b0;
         exec_addr_req   <= 1'b0;
@@ -140,7 +167,11 @@ always@(posedge clock,negedge rst_n)begin
         case(mnstate)
         EXEC_ADDR:  exec_addr_req   <= 1'b1;
         EXEC_WR:    exec_wr_req     <= 1'b1;
-        EXEC_RD:    exec_rd_req     <= 1'b1;
+        EXEC_RD:begin
+            if(last_9_bit)
+                    exec_rd_req     <= 1'b1;
+            else    exec_rd_req     <= exec_rd_req;
+        end
         default:begin
             exec_wr_req     <= 1'b0;
             exec_addr_req   <= 1'b0;
@@ -155,7 +186,7 @@ assign exec_addr   = exec_addr_req   ;
 assign exec_rd     = exec_rd_req     ;
 
 
-always@(posedge clock,negedge rst_n)
+always@(posedge clock/*,negedge rst_n*/)
     if(~rst_n)  address_curr[0:ALEN-1]    <= {ALEN{1'd0}};
     else
         case(mnstate)
@@ -164,7 +195,7 @@ always@(posedge clock,negedge rst_n)
         endcase
 
 // logic [3:0]   curr_cmd;
-always@(posedge clock,negedge rst_n)
+always@(posedge clock/*,negedge rst_n*/)
     if(~rst_n)  curr_cmd    <= MAIN_CMD_IDLE;
     else
         case(mnstate)
@@ -172,29 +203,33 @@ always@(posedge clock,negedge rst_n)
         default:curr_cmd    <= curr_cmd;
         endcase
 
-logic       exist_stop;
+// logic       exist_stop;
 
-always@(posedge clock,negedge rst_n)
-    if(~rst_n)  exist_stop  < =1'b0;
+always@(posedge clock/*,negedge rst_n*/)
+    if(~rst_n)  exist_stop  <= 1'b0;
     else begin
         exist_stop  <= curr_cmd==COMPLETE_WR || curr_cmd==COMPLETE_RD;
     end
 
-always@(posedge clock,negedge rst_n)
-    if(~rst_n)  curr_wr_or_rd  < =1'b0;
+always@(posedge clock/*,negedge rst_n*/)
+    if(~rst_n)  curr_wr_or_rd  <= 1'b0;
     else begin
         curr_wr_or_rd  <= curr_cmd==COMPLETE_WR || curr_cmd==WR_WNO_STOP;
     end
 //-----<< MAIN -CONTRL >>-------------------
-always@(posedge clock,negedge rst_n)
-    if(~rst_n)  exec_wr_len    <= 24'd0;
+always@(posedge clock/*,negedge rst_n*/)
+    if(~rst_n)  exec_len    <= 24'd0;
     else
         case(mnstate)
-        GET_CMD:exec_wr_len    <= burst_len;
-        default:exec_wr_len    <= exec_wr_len;
+        GET_CMD:exec_len    <= burst_len;
+        default:exec_len    <= exec_len;
         endcase
 
-always@(posedge clock,negedge   rst_n)
+always@(posedge clock/*,negedge rst_n*/)
+    if(~rst_n)  zero_len    <= 1'b1;
+    else        zero_len    <= exec_len == 24'd0;
+
+always@(posedge clock/*,negedge rst_n*/)
     if(~rst_n)  tras_cmd_vld    <= 1'b0;
     else
         case(mnstate)
@@ -206,7 +241,7 @@ always@(posedge clock,negedge   rst_n)
 assign  tras_cmd    = CMD_STOP;
 // --->> reset fifo <<-------------
 logic   fifo_rst;
-always@(posedge clock,negedge   rst_n)
+always@(posedge clock/*,negedge rst_n*/)
     if(~rst_n)  fifo_rst    <= 1'b0;
     else
         case(mnstate)
@@ -217,5 +252,33 @@ always@(posedge clock,negedge   rst_n)
 assign  wfifo_rst   = fifo_rst;
 assign  rfifo_rst   = fifo_rst;
 // ---<< reset fifo >>-------------
+//---->> slaver check <<-----------
+always@(posedge clock/*,negedge rst_n*/)
+    if(~rst_n)  curr_status <= 5'd0;
+    else begin
+        case(mnstate)
+        MIDLE:begin
+            curr_status[0] <= curr_status[1];
+            curr_status[1] <= 1'b0;
+        end
+        default:begin
+            if(slaver_ack_ok)
+                    curr_status[1]  <= 1'b1;
+            else    curr_status[1]  <= curr_status[1];
+        end
+        endcase
+    end
+
+//--->> MODULE PROCESS ID <<---------------------
+assign tras_cmd_mid     = MODULE_ID;
+
+always@(posedge clock/*,negedge rst_n*/)
+    if(~rst_n)  tras_cmd_proc_id <= 2'd0;
+    else
+        case(mnstate)
+        MFSH:   tras_cmd_proc_id <= tras_cmd_proc_id + 1'b1;
+        default:tras_cmd_proc_id <= tras_cmd_proc_id;
+        endcase
+//---<< MODULE PROCESS ID >>---------------------
 
 endmodule

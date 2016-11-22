@@ -30,15 +30,20 @@ common_interface #(
 )common_interface_0(
 /*    input */      .clock      (clock      ),
 /*    input */      .rst_n      (rst_n      ),
-/*    input */      .clk_en     (1          )
+/*    input */      .clk_en     (1'b1          )
 );
 
 logic   enable;
 
-simple_wr simple_wr_inst(
+simple_rd simple_wr_inst(
 /*    input                    */     .enable       (enable     ),
 /*    common_interface.master  */     .cinf         (common_interface_0)
 );
+
+// iic_eeprom_wr_byte simple_wr_inst(
+// /*    input                    */     .enable       (enable     ),
+// /*    common_interface.master  */     .cinf         (common_interface_0)
+// );
 
 logic            scl_i;
 logic            sda_i;
@@ -47,11 +52,11 @@ logic            scl_t;
 logic            sda_o;
 logic            sda_t;
 
-wire            SCL,SDA;
+tri1            SCL,SDA;
 
 I2C_master#(
     .ALEN           (7      ),
-    .PERSCALER      (100    )
+    .PERSCALER      (1000   )
 )I2C_master_inst(
 /*    common_interface.slaver */  .cinf     (common_interface_0 ),
     //-->> iic
@@ -66,15 +71,26 @@ I2C_master#(
 assign  SCL = scl_t? scl_o : 1'bz;
 assign  SDA = sda_t? sda_o : 1'bz;
 
-assign  scl_i = !scl_t? SCL : 1'b1;
-assign  sda_i = !sda_t? SDA : 1'b1;
+assign  scl_i = !scl_t? SCL : scl_o;
+assign  sda_i = !sda_t? SDA : scl_o;
 
+M24AA01 M24AA01_inst(
+/*  input       */         .A0      (1'b0  ),                             // unconnected pin
+/*  input       */         .A1      (1'b0  ),                             // unconnected pin
+/*  input       */         .A2      (1'b0  ),                             // unconnected pin
+/*  input       */         .WP      (1'b0  ),                             // write protect pin
+/*  inout       */         .SDA     (SDA),                            // serial data I/O
+/*  input       */         .SCL     (SCL),                            // serial data clock
+/*  input       */         .RESET   (!rst_n  )                          // system reset
+ );
 
 initial begin
     enable  = 0;
     wait(rst_n);
     repeat(10) @(posedge clock);
     enable  = 1;
+    repeat(1) @(posedge clock);
+    enable  = 0;
 end
 
 

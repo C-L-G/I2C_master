@@ -12,7 +12,7 @@ interface common_interface #(
     parameter   CSIZE = 4,
     parameter   LSIZE = 24,
     parameter   DSIZE = 32,
-    parameter   ASIZE = 10,
+    parameter   ASIZE = 10
 )(
     input       clock,
     input       rst_n,
@@ -20,12 +20,12 @@ interface common_interface #(
 );
 
 logic               cmd_vld;
-logic[ASIZE-1:0]    addr,
+logic[ASIZE-1:0]    addr;
 logic[LSIZE-1:0]    burst_len;
 logic               cmd_ready;
 logic               finish;
 logic[CSIZE-1:0]    cmd;
-logic[3:0]          status;
+logic[4:0]          status;
 
 //-->>wr port
 logic                  wr_vld     ;
@@ -67,7 +67,7 @@ modport slaver (
     input       addr,
     input       burst_len,
     input       cmd_ready,
-    inout       finish,
+    input       finish,
     input       cmd,
     output      status,
     input       wr_vld  ,

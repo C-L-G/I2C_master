@@ -43,7 +43,7 @@ logic[DSIZE-1:0]   to_down_data;
 
 assign  from_down_ready = m00.ready;
 assign  m00.valid       = to_down_vld;
-assign  m00.data        = to_down_vld;
+assign  m00.data        = to_down_data;
 
 always@(*)
     case(curr_path)
@@ -73,19 +73,29 @@ always@(*)
         from_up_data = s00.data;
     endcase
 
-always@(*)
-    case(curr_path)
-    0:  to_up_ready = to_up_ready[0];
-    1:  to_up_ready = to_up_ready[1];
-    2:  to_up_ready = to_up_ready[2];
-    3:  to_up_ready = to_up_ready[3];
-    4:  to_up_ready = to_up_ready[4];
-    5:  to_up_ready = to_up_ready[5];
-    6:  to_up_ready = to_up_ready[6];
-    7:  to_up_ready = to_up_ready[7];
-    default:
-        to_up_ready = to_up_ready[0];
-    endcase
+// always@(*)
+//     case(curr_path)
+//     0:  to_up_ready = to_up_ready_array[0];
+//     1:  to_up_ready = to_up_ready_array[1];
+//     2:  to_up_ready = to_up_ready_array[2];
+//     3:  to_up_ready = to_up_ready_array[3];
+//     4:  to_up_ready = to_up_ready_array[4];
+//     5:  to_up_ready = to_up_ready_array[5];
+//     6:  to_up_ready = to_up_ready_array[6];
+//     7:  to_up_ready = to_up_ready_array[7];
+//     default:
+//         to_up_ready = to_up_ready_array[0];
+//     endcase
+assign to_up_ready = to_up_ready_array[curr_path];
+
+assign  s00.ready   = to_up_ready_array[0];
+assign  s01.ready   = to_up_ready_array[1];
+assign  s02.ready   = to_up_ready_array[2];
+assign  s03.ready   = to_up_ready_array[3];
+assign  s04.ready   = to_up_ready_array[4];
+assign  s05.ready   = to_up_ready_array[5];
+assign  s06.ready   = to_up_ready_array[6];
+assign  s07.ready   = to_up_ready_array[7];
 
 
 
@@ -97,7 +107,7 @@ localparam      IDLE                    = 4'd0,
                 VD_CN_VD_BUF_OPD_CLU    = 4'd4,     //  valid connector,valid buffer,open down stream ,close upstream
                 OVER_FLOW               = 4'd5;     //  error
 
-always@(posedge clock,negedge rst_n)
+always@(posedge clock/*,negedge rst_n*/)
     if(~rst_n)   cstate  <= IDLE;
     else         cstate  <= nstate;
 
@@ -138,7 +148,7 @@ always@(*)
     default:    nstate = IDLE;
     endcase
 //--->> current path <<---------------------
-always@(posedge clock,negedge rst_n)
+always@(posedge clock/*,negedge rst_n*/)
     if(~rst_n)  curr_path   <= 3'd0;
     else
         case(nstate)
@@ -150,7 +160,7 @@ always@(posedge clock,negedge rst_n)
 //--->> to up ready signal <<---------------
 reg             to_u_ready_reg;
 reg             over_buf_vld;
-always@(posedge clock,negedge rst_n)
+always@(posedge clock/*,negedge rst_n*/)
     if(~rst_n)   to_up_ready_array   <= 8'd0;
     else begin
         to_up_ready_array   <= 8'd0;
@@ -176,7 +186,7 @@ always@(posedge clock,negedge rst_n)
 reg [DSIZE-1:0]     connector;
 // reg                 connector_vld;
 reg [DSIZE-1:0]     over_buf;
-always@(posedge clock,negedge rst_n)
+always@(posedge clock/*,negedge rst_n*/)
     if(~rst_n)   connector   <= {DSIZE{1'b0}};
     else
         case(nstate)
@@ -192,7 +202,7 @@ always@(posedge clock,negedge rst_n)
         endcase
 
 
-always@(posedge clock,negedge rst_n)
+always@(posedge clock/*,negedge rst_n*/)
     if(~rst_n)   connector_vld   <= 1'b0;
     else
         case(nstate)
@@ -208,7 +218,7 @@ always@(posedge clock,negedge rst_n)
         endcase
 //---<< CONNECTOR >>------------------
 //----->> BUFFER <<---------------------
-always@(posedge clock,negedge rst_n)begin:BUFFER_BLOCK
+always@(posedge clock/*,negedge rst_n*/)begin:BUFFER_BLOCK
     if(~rst_n)begin
         over_buf    <= {DSIZE{1'b0}};
     end else begin
@@ -227,7 +237,7 @@ always@(posedge clock,negedge rst_n)begin:BUFFER_BLOCK
         endcase
 end end
 
-always@(posedge clock,negedge rst_n)
+always@(posedge clock/*,negedge rst_n*/)
     if(~rst_n)   over_buf_vld    <= 1'b0;
     else
         case(nstate)
@@ -244,7 +254,7 @@ always@(posedge clock,negedge rst_n)
 
 assign empty_buffer = !over_buf_vld;
 assign full_buffer  =  over_buf_vld;
-always@(posedge clock,negedge rst_n)
+always@(posedge clock/*,negedge rst_n*/)
     if(~rst_n)   over_flow_buffer    <= 1'b0;
     else
         case(nstate)
@@ -258,7 +268,7 @@ always@(posedge clock,negedge rst_n)
 //----->> to down data <<---------------
 reg         to_d_wr_en_reg;
 
-always@(posedge clock,negedge rst_n)
+always@(posedge clock/*,negedge rst_n*/)
     if(~rst_n)  to_d_wr_en_reg  <= 1'b0;
     else
         case(nstate)
